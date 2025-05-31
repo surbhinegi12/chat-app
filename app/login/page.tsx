@@ -4,11 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MdOutlineLocalPhone } from "react-icons/md";
 import { FaRegUser } from "react-icons/fa";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from "../../lib/supabase";
 
 const STATIC_OTP = "123456";
 
@@ -18,6 +14,7 @@ export default function AuthPage() {
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState(Array(6).fill(""));
+  const [fullName, setFullName] = useState("");
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [status, setStatus] = useState<null | {
     type: "success" | "error" | "loading";
@@ -103,7 +100,7 @@ export default function AuthPage() {
     otpRefs.current[0]?.focus();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!isOtpValid) {
@@ -120,9 +117,27 @@ export default function AuthPage() {
       message: "Logging in...",
     });
 
+    const { data, error } = await supabase.from("users").upsert(
+      {
+        mobile_number: mobile,
+        full_name: tab === "signup" ? fullName : "Anonymous",
+        role: "member",
+      },
+      { onConflict: "mobile_number" }
+    );
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      setStatus({
+        type: "error",
+        message: error.message || "Error saving user data.",
+      });
+      return;
+    }
+
     setTimeout(() => {
       router.push("/chats");
-    }, 2000);
+    }, 1000);
   };
 
   return (
@@ -194,6 +209,8 @@ export default function AuthPage() {
                     id="fullname"
                     name="fullname"
                     type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     required
                     placeholder="Enter your full name"
                     className="pl-10 block w-full rounded-md border border-green-300 px-3 py-2 text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#169D47]"
