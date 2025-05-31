@@ -118,12 +118,32 @@ export default function AuthPage() {
     });
 
     try {
+      if (tab === "signin") {
+        // Check if user exists and get their details
+        const { data: user, error: checkError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("mobile_number", `+91${mobile}`)
+          .single();
+
+        if (!user || checkError) {
+          setStatus({
+            type: "error",
+            message: "Please sign up first.",
+          });
+          return;
+        }
+
+        // Store user info in localStorage
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+
       if (tab === "signup") {
         // Check if user already exists
         const { data: existingUser, error: checkError } = await supabase
           .from("users")
           .select("id")
-          .eq("mobile_number", mobile)
+          .eq("mobile_number", `+91${mobile}`)
           .single();
 
         if (existingUser) {
@@ -134,38 +154,29 @@ export default function AuthPage() {
           return;
         }
 
-        const { error: insertError } = await supabase.from("users").insert({
-          mobile_number: mobile,
-          full_name: fullName,
-          role: "member",
-        });
-
-        if (insertError) {
-          throw insertError;
-        }
-      }
-
-      if (tab === "signin") {
-        const { data: existingUser, error: checkError } = await supabase
+        // Create user profile
+        const { data: newUser, error: insertError } = await supabase
           .from("users")
-          .select("id")
-          .eq("mobile_number", mobile)
+          .insert({
+            mobile_number: `+91${mobile}`,
+            full_name: fullName,
+            role: "member",
+          })
+          .select()
           .single();
 
-        if (!existingUser || checkError) {
-          setStatus({
-            type: "error",
-            message: "Please sign up first.",
-          });
-          return;
-        }
+        if (insertError) throw insertError;
+
+        // Store user info in localStorage
+        localStorage.setItem('user', JSON.stringify(newUser));
       }
 
-      setStatus({ type: "success", message: "Logging you in" });
+      setStatus({ type: "success", message: "Success! Redirecting..." });
 
-      setTimeout(() => {
-        router.push("/chats");
-      }, 1000);
+      // Wait for the status message to be visible
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      
+      router.push("/chats");
     } catch (err: any) {
       console.error("Submit Error:", err);
       setStatus({
