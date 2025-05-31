@@ -114,30 +114,65 @@ export default function AuthPage() {
 
     setStatus({
       type: "loading",
-      message: "Logging in...",
+      message: tab === "signup" ? "Creating account..." : "Logging in...",
     });
 
-    const { data, error } = await supabase.from("users").upsert(
-      {
-        mobile_number: mobile,
-        full_name: tab === "signup" ? fullName : "Anonymous",
-        role: "member",
-      },
-      { onConflict: "mobile_number" }
-    );
+    try {
+      if (tab === "signup") {
+        // Check if user already exists
+        const { data: existingUser, error: checkError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("mobile_number", mobile)
+          .single();
 
-    if (error) {
-      console.error("Supabase insert error:", error);
+        if (existingUser) {
+          setStatus({
+            type: "error",
+            message: "Account already exists with this mobile number.",
+          });
+          return;
+        }
+
+        const { error: insertError } = await supabase.from("users").insert({
+          mobile_number: mobile,
+          full_name: fullName,
+          role: "member",
+        });
+
+        if (insertError) {
+          throw insertError;
+        }
+      }
+
+      if (tab === "signin") {
+        const { data: existingUser, error: checkError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("mobile_number", mobile)
+          .single();
+
+        if (!existingUser || checkError) {
+          setStatus({
+            type: "error",
+            message: "Please sign up first.",
+          });
+          return;
+        }
+      }
+
+      setStatus({ type: "success", message: "Logging you in" });
+
+      setTimeout(() => {
+        router.push("/chats");
+      }, 1000);
+    } catch (err: any) {
+      console.error("Submit Error:", err);
       setStatus({
         type: "error",
-        message: error.message || "Error saving user data.",
+        message: err.message || "Something went wrong.",
       });
-      return;
     }
-
-    setTimeout(() => {
-      router.push("/chats");
-    }, 1000);
   };
 
   return (
