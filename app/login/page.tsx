@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MdOutlineLocalPhone } from "react-icons/md";
 import { FaRegUser } from "react-icons/fa";
 import { createClient } from "@supabase/supabase-js";
@@ -9,15 +10,72 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const STATIC_OTP = "123456";
+
 export default function AuthPage() {
+  const router = useRouter();
+
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState(Array(6).fill(""));
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [status, setStatus] = useState<null | {
+    type: "success" | "error" | "loading";
+    message: string;
+  }>(null);
+  const [resendCountdown, setResendCountdown] = useState(0);
 
   const isMobileValid = /^\d{10}$/.test(mobile);
   const showMobileError = mobile.length > 0 && !isMobileValid;
   const isOtpComplete = otp.every((digit) => digit.match(/^\d$/));
+  const isOtpValid = otp.join("") === STATIC_OTP;
+
+  //Send otp and start countdown
+  const sendOtp = () => {
+    if (!isMobileValid) return;
+    setStatus({
+      type: "success",
+      message: `OTP sent to +91 ${mobile}`,
+    });
+    setResendCountdown(10);
+
+    const interval = setInterval(() => {
+      setResendCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setStatus(null); // Hide the message when countdown ends
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Countdown timer for resend button
+  useEffect(() => {
+    if (resendCountdown === 0) return;
+    const timer = setInterval(() => {
+      setResendCountdown((count) => {
+        if (count <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return count - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
+
+  // Send OTP on mobile valid change
+  useEffect(() => {
+    if (isMobileValid) {
+      sendOtp();
+    } else {
+      setStatus(null);
+      setResendCountdown(0);
+    }
+  }, [isMobileValid, mobile]);
 
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d?$/.test(value)) return;
@@ -40,12 +98,40 @@ export default function AuthPage() {
     }
   };
 
+  const clearOtpInputs = () => {
+    setOtp(Array(6).fill(""));
+    otpRefs.current[0]?.focus();
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!isOtpValid) {
+      setStatus({
+        type: "error",
+        message: "Invalid OTP.",
+      });
+      clearOtpInputs();
+      return;
+    }
+
+    setStatus({
+      type: "loading",
+      message: "Logging in...",
+    });
+
+    setTimeout(() => {
+      router.push("/chats");
+    }, 2000);
+  };
+
   return (
     <main
       className="min-h-screen bg-cover bg-center bg-no-repeat flex items-center justify-center"
       style={{ backgroundImage: "url('/background.png')" }}
     >
       <section className="w-full max-w-md rounded-xl bg-white shadow-lg overflow-hidden">
+        {/* Header */}
         <header
           className="flex flex-col items-center justify-center py-6 px-4"
           style={{
@@ -54,7 +140,7 @@ export default function AuthPage() {
           }}
         >
           <div className="bg-white rounded-full p-1 shadow-md mb-3">
-            <img alt="Your Company" src="/logo.png" className="h-14 w-14" />
+            <img alt="Logo" src="/logo.png" className="h-14 w-14" />
           </div>
           <h1 className="text-center text-2xl font-bold text-white mb-2">
             Periskope Team Chat
@@ -90,16 +176,8 @@ export default function AuthPage() {
 
         {/* Form */}
         <section className="px-6 pt-4 pb-8">
-          <form
-            className="space-y-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              alert(
-                `Submitting ${tab} with Mobile: ${mobile} OTP: ${otp.join("")}`
-              );
-            }}
-          >
-            {/* Full Name (Sign Up) */}
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {/* Full Name */}
             {tab === "signup" && (
               <div>
                 <label
@@ -125,7 +203,7 @@ export default function AuthPage() {
             )}
 
             {/* Mobile Number */}
-            <div className="relative">
+            <div>
               <label
                 htmlFor="mobile"
                 className="block text-sm font-bold text-gray-900 mb-1"
@@ -166,7 +244,7 @@ export default function AuthPage() {
               <label className="block text-sm font-bold text-gray-900 mb-1">
                 OTP
               </label>
-              <div className="grid grid-cols-6 gap-4 justify-center mb-3">
+              <div className="grid grid-cols-6 gap-3 justify-center mb-3">
                 {otp.map((digit, i) => (
                   <input
                     key={i}
@@ -184,7 +262,7 @@ export default function AuthPage() {
                     className={`h-14 w-full text-center rounded-md text-xl ${
                       !isMobileValid
                         ? "bg-gray-100 text-gray-400 border border-gray-200"
-                        : "bg-white border border-green-300 focus:outline-none focus:ring-2 focus:ring-[#169D47]"
+                        : "bg-white text-gray-900 border border-green-300 focus:outline-none focus:ring-2 focus:ring-[#169D47]"
                     }`}
                   />
                 ))}
@@ -192,13 +270,58 @@ export default function AuthPage() {
 
               <div className="flex items-center justify-center text-sm text-gray-500 mb-1">
                 <span>Didn't receive OTP?</span>
-                <a
-                  href="#"
-                  className="ml-1 font-semibold text-[#159B48] hover:text-[#14843E]"
+                <button
+                  type="button"
+                  disabled={resendCountdown > 0}
+                  onClick={sendOtp}
+                  className={`ml-1 font-semibold text-[#159B48] hover:text-[#14843E] ${
+                    resendCountdown > 0
+                      ? "text-green-300 cursor-not-allowed hover:text-green-300"
+                      : ""
+                  }`}
                 >
-                  Resend
-                </a>
+                  {resendCountdown > 0
+                    ? `Resend in ${resendCountdown}s`
+                    : "Resend"}
+                </button>
               </div>
+
+              {/* Status Message */}
+              {status && (
+                <div
+                  className={`mt-3 text-sm px-4 py-2 rounded-md text-center font-medium ${
+                    status.type === "success"
+                      ? "bg-green-100 text-green-700"
+                      : status.type === "error"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-blue-100 text-blue-700 flex items-center justify-center space-x-2"
+                  }`}
+                >
+                  {status.type === "loading" && (
+                    <svg
+                      className="animate-spin h-5 w-5 text-blue-700"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8H4z"
+                      ></path>
+                    </svg>
+                  )}
+                  <span>{status.message}</span>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}
@@ -206,10 +329,10 @@ export default function AuthPage() {
               <button
                 type="submit"
                 disabled={!isMobileValid || !isOtpComplete}
-                className={`w-full flex justify-center rounded-md px-4 py-2 font-semibold text-white focus:ring-2 focus:ring-offset-2 ${
+                className={`w-full flex justify-center rounded-md px-4 py-2 font-semibold text-white focus:ring-2 focus:ring-offset-2 focus:ring-[#159B48] ${
                   !isMobileValid || !isOtpComplete
-                    ? "bg-green-600 cursor-not-allowed opacity-70"
-                    : "bg-[#169D47] hover:bg-[#14823E] focus:ring-[#159B48]"
+                    ? "bg-green-600 cursor-not-allowed opacity-60"
+                    : "bg-[#169D47] hover:bg-[#14823E]"
                 }`}
               >
                 {tab === "signin" ? "Sign In" : "Create Account"}
