@@ -33,16 +33,21 @@ export default function ChatHeader({ chat, onChatUpdated }: ChatHeaderProps) {
     }, {} as Record<string, boolean>)
   );
 
-  // Get chat name or first member's name for private chats
+  // Get chat name or other user's name for private chats
   const chatName = chat.type === "private" 
-    ? chat.members[0]?.full_name 
+    ? chat.members.find(m => !m.id.includes("current"))?.full_name || "Unknown User"
     : chat.name || "Unnamed Group";
 
   // Get member names for display
-  const memberNames = chat.members.map(m => m.full_name).join(", ");
+  const memberNames = chat.members
+    .filter(m => !m.id.includes("current"))
+    .map(m => m.full_name)
+    .join(", ");
 
   // Get visible members (first 5) and remaining count
-  const visibleMembers = chat.members.slice(0, 5);
+  const visibleMembers = chat.type === "private" 
+    ? chat.members.filter(m => !m.id.includes("current")).slice(0, 1)
+    : chat.members.slice(0, 5);
   const remainingCount = chat.members.length > 5 ? chat.members.length - 5 : 0;
 
   return (

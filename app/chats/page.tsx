@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import ChatList from "@/components/chat/ChatList";
 import ChatWindow from "@/components/chat/ChatWindow";
@@ -33,12 +33,8 @@ export default function ChatsPage() {
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshChats, setRefreshChats] = useState<
-    (() => Promise<void>) | undefined
-  >();
-  const [latestMessages, setLatestMessages] = useState<{ [key: string]: any }>(
-    {}
-  );
+  const [refreshChatsCallback, setRefreshChatsCallback] = useState<(() => Promise<void>) | undefined>();
+  const [latestMessages, setLatestMessages] = useState<{ [key: string]: any }>({});
 
   useEffect(() => {
     // Check if user is authenticated
@@ -189,6 +185,16 @@ export default function ChatsPage() {
     }));
   };
 
+  const handleRefresh = useCallback(async () => {
+    if (refreshChatsCallback) {
+      await refreshChatsCallback();
+    }
+  }, [refreshChatsCallback]);
+
+  const handleRefreshCallback = useCallback((callback: () => Promise<void>) => {
+    setRefreshChatsCallback(() => callback);
+  }, []);
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -215,10 +221,13 @@ export default function ChatsPage() {
 
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg shadow-sm">
+            <button 
+              onClick={handleRefresh}
+              className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg shadow-sm"
+            >
               <LuRefreshCcwDot className="w-5 h-5 text-gray-600" />
               <span className="text-sm text-gray-600 font-medium">Refresh</span>
-            </div>
+            </button>
             <div className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg shadow-sm">
               <IoHelpCircleOutline className="w-5 h-5 text-gray-600" />
               <span className="text-sm text-gray-600 font-medium">Help</span>
@@ -272,6 +281,7 @@ export default function ChatsPage() {
             onChatSelect={setSelectedChat}
             currentUser={user}
             latestMessages={latestMessages}
+            onRefreshChats={handleRefreshCallback}
           />
         </div>
 

@@ -95,6 +95,13 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Filter out current user from chat members
+  const otherMembers = chat.members.filter(m => m.id !== currentUser.id);
+  const displayChat = {
+    ...chat,
+    members: otherMembers
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -430,7 +437,7 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
     <div className="flex flex-1 h-[calc(100vh-128px)] overflow-hidden">
       <div className="flex-1 flex flex-col">
         <ChatHeader 
-          chat={chat} 
+          chat={displayChat} 
           onChatUpdated={handleChatUpdate}
         />
         {/* Messages */}

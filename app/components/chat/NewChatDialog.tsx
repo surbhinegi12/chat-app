@@ -145,7 +145,9 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
         };
 
         onChatSelect(formattedChat);
-        onChatCreated?.();
+        if (onChatCreated) {
+          await onChatCreated();
+        }
       } else {
         // Create group chat
         if (!groupName.trim()) {
@@ -187,7 +189,9 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
         };
 
         onChatSelect(formattedChat);
-        onChatCreated?.();
+        if (onChatCreated) {
+          await onChatCreated();
+        }
       }
 
       onClose();

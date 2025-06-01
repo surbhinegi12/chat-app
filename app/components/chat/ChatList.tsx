@@ -77,7 +77,7 @@ interface ChatListProps {
   onChatSelect: (chat: any) => void;
   currentUser: any;
   latestMessages: { [key: string]: Message };
-  onRefreshChats?: () => Promise<void>;
+  onRefreshChats?: (callback: () => Promise<void>) => void;
 }
 
 const getLabelStyle = (labelName: string) => {
@@ -126,14 +126,13 @@ export default function ChatList({
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    type: "all", // all, private, group
+    type: "all",
     label: "all",
   });
   const [labels, setLabels] = useState<Label[]>([]);
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [selectedChatForLabel, setSelectedChatForLabel] = useState<any>(null);
-  const [longPressTimeout, setLongPressTimeout] =
-    useState<NodeJS.Timeout | null>(null);
+  const [longPressTimeout, setLongPressTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
 
   // Fetch labels
@@ -247,9 +246,15 @@ export default function ChatList({
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
+      // Only filter out current user for private chats
+      const members = cm.chat.members.map((m: any) => m.user);
+      const displayMembers = cm.chat.type === "private" 
+        ? members.filter((m: any) => m.id !== currentUser.id)
+        : members;
+
       return {
         ...cm.chat,
-        members: cm.chat.members.map((m: any) => m.user),
+        members: displayMembers,
         messages: sortedMessages,
         lastMessage: sortedMessages[0] || null,
         labels: cm.chat.labels?.map((l: any) => l.label).filter(Boolean) || [],
@@ -267,107 +272,59 @@ export default function ChatList({
     setChats(sortedChats);
   }, [currentUser?.id]);
 
+  // Set up refresh callback
   useEffect(() => {
     if (onRefreshChats) {
-      onRefreshChats = fetchChats;
+      onRefreshChats(fetchChats);
     }
   }, [fetchChats, onRefreshChats]);
 
+  // Initial fetch and subscription setup
   useEffect(() => {
     if (!currentUser) return;
 
-    let chatListSubscription: any = null;
+    fetchChats();
 
-    const setupRealtimeSubscription = async () => {
-      // Initial fetch
-      await fetchChats();
+    // Subscribe to chat_members changes
+    const membershipSubscription = supabase
+      .channel('chat_members_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'chat_members',
+          filter: `user_id=eq.${currentUser.id}`
+        },
+        () => {
+          console.log('Chat membership changed, refreshing chats...');
+          fetchChats();
+        }
+      )
+      .subscribe();
 
-      // Set up realtime subscription
-      chatListSubscription = supabase
-        .channel(`chatlist:${currentUser.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "messages",
-          },
-          async (payload) => {
-            console.log("ChatList change received:", payload);
+    // Subscribe to messages changes
+    const messagesSubscription = supabase
+      .channel('messages_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          console.log('New message received, refreshing chats...');
+          fetchChats();
+        }
+      )
+      .subscribe();
 
-            if (payload.eventType === "INSERT") {
-              // Fetch the complete message with sender info
-              const { data: newMessage } = await supabase
-                .from("messages")
-                .select(
-                  `
-                  *,
-                  sender:users(
-                    id,
-                    full_name,
-                    mobile_number
-                  )
-                `
-                )
-                .eq("id", payload.new.id)
-                .single();
-
-              if (newMessage) {
-                // Update the specific chat's messages and lastMessage
-                setChats((prevChats) => {
-                  return prevChats
-                    .map((chat) => {
-                      if (chat.id === newMessage.chat_id) {
-                        const updatedMessages = [
-                          ...(chat.messages || []),
-                          newMessage,
-                        ];
-                        // Sort messages by date, newest first
-                        const sortedMessages = updatedMessages.sort(
-                          (a, b) =>
-                            new Date(b.created_at).getTime() -
-                            new Date(a.created_at).getTime()
-                        );
-
-                        return {
-                          ...chat,
-                          messages: sortedMessages,
-                          lastMessage: sortedMessages[0],
-                        };
-                      }
-                      return chat;
-                    })
-                    .sort((a, b) => {
-                      // Re-sort chats by latest message
-                      const aTime = a.lastMessage?.created_at || a.created_at;
-                      const bTime = b.lastMessage?.created_at || b.created_at;
-                      return (
-                        new Date(bTime).getTime() - new Date(aTime).getTime()
-                      );
-                    });
-                });
-              }
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log(
-            `ChatList subscription status for user ${currentUser.id}:`,
-            status
-          );
-        });
-    };
-
-    setupRealtimeSubscription();
-
-    // Cleanup subscription
     return () => {
-      console.log("Cleaning up ChatList subscription...");
-      if (chatListSubscription) {
-        chatListSubscription.unsubscribe();
-      }
+      membershipSubscription.unsubscribe();
+      messagesSubscription.unsubscribe();
     };
-  }, [currentUser?.id, fetchChats]);
+  }, [currentUser, fetchChats]);
 
   // Add useEffect to sort chats when latestMessages changes
   useEffect(() => {
@@ -623,9 +580,7 @@ export default function ChatList({
         {/* Chat List */}
         <div className="flex-1 overflow-y-auto">
           {filteredChats.map((chat) => {
-            const otherMembers = chat.members.filter(
-              (m: any) => m.id !== currentUser?.id
-            );
+            const otherMembers = chat.members;
             const chatName =
               chat.type === "private"
                 ? otherMembers[0]?.full_name
@@ -714,30 +669,27 @@ export default function ChatList({
                         "No messages yet"}
                     </p>
                     <div className="flex items-center justify-between mt-0.5">
-                      {chat.type === "group" ? (
-                        <div className="flex items-center bg-gray-50 rounded-lg px-2 py-1">
-                          <MdOutlineLocalPhone className="w-4 h-4 text-gray-400 mr-1" />
-                          <span className="text-xs text-gray-500 font-medium">
-                            {chat.members[0]?.mobile_number} +
-                            {chat.members.length - 1}
-                          </span>
-                        </div>
-                      ) : (
+                      {chat.type === "private" ? (
                         <div className="flex items-center bg-gray-50 rounded-lg px-2 py-1">
                           <MdOutlineLocalPhone className="w-4 h-4 text-gray-400 mr-1" />
                           <span className="text-xs text-gray-500 font-medium">
                             {otherMembers[0]?.mobile_number}
                           </span>
                         </div>
+                      ) : (
+                        <div className="flex items-center bg-gray-50 rounded-lg px-2 py-1">
+                          <MdOutlineLocalPhone className="w-4 h-4 text-gray-400 mr-1" />
+                          <span className="text-xs text-gray-500 font-medium">
+                            {chat.members[0]?.mobile_number}
+                            {chat.members.length > 1 && ` +${chat.members.length - 1}`}
+                          </span>
+                        </div>
                       )}
                       <span className="meta-text text-gray-500 font-normal">
-                        {(latestMessages[chat.id] || chat.lastMessage)
-                          ?.created_at
+                        {(latestMessages[chat.id] || chat.lastMessage)?.created_at
                           ? formatMessageDate(
                               new Date(
-                                (
-                                  latestMessages[chat.id] || chat.lastMessage
-                                ).created_at
+                                (latestMessages[chat.id] || chat.lastMessage).created_at
                               )
                             )
                           : ""}
@@ -858,6 +810,7 @@ export default function ChatList({
         onClose={() => setShowNewChatDialog(false)}
         onChatSelect={onChatSelect}
         currentUser={currentUser}
+        onChatCreated={fetchChats}
       />
     </div>
   );

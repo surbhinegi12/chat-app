@@ -21,6 +21,7 @@ const nextConfig = {
                 source: '/',
                 destination: '/login',
                 permanent: false,
+                basePath: false
             },
         ]
     }
