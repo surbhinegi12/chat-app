@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../../lib/supabase";
-import { TiHome } from "react-icons/ti";
+import { TiHome, TiFlowMerge } from "react-icons/ti";
 import { AiFillMessage } from "react-icons/ai";
 import { GoGraph } from "react-icons/go";
-import { HiUserGroup, HiSpeakerphone, HiOutlineSparkles } from "react-icons/hi";
+import { HiSpeakerphone, HiOutlineSparkles } from "react-icons/hi";
 import { RiFolderImageFill } from "react-icons/ri";
 import { IoIosSettings } from "react-icons/io";
 import { FiSearch } from "react-icons/fi";
@@ -15,12 +15,42 @@ import { MdChecklist } from "react-icons/md";
 import { RiContactsBookFill } from "react-icons/ri";
 import { IoTicket } from "react-icons/io5";
 import { VscDesktopDownload } from "react-icons/vsc";
-import { format } from "date-fns";
+import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
+import {
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems,
+  Transition,
+} from "@headlessui/react";
+import { BsThreeDots } from "react-icons/bs";
+import { ChevronDownIcon } from "@heroicons/react/20/solid";
+import { Fragment } from "react";
+import NewChatDialog from "./NewChatDialog";
+import { TfiMenuAlt } from "react-icons/tfi";
+import { TbStarsFilled } from "react-icons/tb";
+import { TbLayoutSidebarLeftExpandFilled } from "react-icons/tb";
 
-interface ChatListProps {
-  selectedChat: any;
-  onChatSelect: (chat: any) => void;
-  currentUser: any;
+interface Label {
+  id: string;
+  name: string;
+  color: string;
+  textColor: string;
+}
+
+interface Message {
+  id: string;
+  content: string;
+  sender_id: string;
+  chat_id: string;
+  created_at: string;
+  type: "text" | "image" | "video" | "file";
+  attachment_url?: string;
+  sender: {
+    id: string;
+    full_name: string;
+    mobile_number?: string;
+  };
 }
 
 interface ChatMember {
@@ -46,10 +76,18 @@ interface ChatMember {
   };
 }
 
+interface ChatListProps {
+  selectedChat: any;
+  onChatSelect: (chat: any) => void;
+  currentUser: any;
+  latestMessages: {[key: string]: Message};
+}
+
 export default function ChatList({
   selectedChat,
   onChatSelect,
   currentUser,
+  latestMessages,
 }: ChatListProps) {
   const [chats, setChats] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,57 +96,76 @@ export default function ChatList({
     type: "all", // all, private, group
     label: "all",
   });
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [selectedChatForLabel, setSelectedChatForLabel] = useState<any>(null);
+  const [longPressTimeout, setLongPressTimeout] =
+    useState<NodeJS.Timeout | null>(null);
+  const [showNewChatDialog, setShowNewChatDialog] = useState(false);
 
+  // Fetch labels
   useEffect(() => {
-    if (!currentUser) return;
+    const fetchLabels = async () => {
+      const { data: labelsData } = await supabase
+        .from("chat_labels")
+        .select("*")
+        .order("name");
+      if (labelsData) {
+        // Update label colors with exact brand colors
+        const updatedLabels = labelsData.map((label) => {
+          let textColor = "";
+          let bgColor = "";
 
-    // Subscribe to chats
-    const fetchChats = async () => {
-      const { data: chatMembers } = await supabase
-        .from("chat_members")
-        .select(
-          `
-          chat:chats (
-            *,
-            members:chat_members(
-              user:users(*)
-            ),
-            last_message:messages(
-              *,
-              sender:users(*)
-            )
-          )
-        `
-        )
-        .eq("user_id", currentUser.id)
-        .order("joined_at", { ascending: false });
+          switch (label.name.toLowerCase()) {
+            case "content":
+              textColor = "#6DE4A6";
+              bgColor = "#F4FDF8";
+              break;
+            case "demo":
+              textColor = "#C59F88";
+              bgColor = "#FDF9F8";
+              break;
+            case "dont send":
+              textColor = "#E53E31";
+              bgColor = "#FEF5F5";
+              break;
+            case "signup":
+              textColor = "#6DE4A6";
+              bgColor = "#F4FDF8";
+              break;
+            case "internal":
+              textColor = "#6DE4A6";
+              bgColor = "#F4FDF8";
+              break;
+            default:
+              textColor = "#6DE4A6";
+              bgColor = "#F4FDF8";
+          }
 
-      if (chatMembers) {
-        const formattedChats = (chatMembers as unknown as ChatMember[]).map(
-          (cm) => ({
-            ...cm.chat,
-            members: cm.chat.members.map((m: any) => m.user),
-            lastMessage: cm.chat.last_message?.[0],
-          })
-        );
-        setChats(formattedChats);
+          return {
+            ...label,
+            color: bgColor,
+            textColor: textColor,
+          };
+        });
+        setLabels(updatedLabels);
       }
     };
 
-    fetchChats();
+    fetchLabels();
 
-    // Subscribe to new messages
+    // Subscribe to label changes
     const subscription = supabase
-      .channel("messages")
+      .channel("labels")
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "messages",
+          table: "chat_labels",
         },
         () => {
-          fetchChats(); // Refresh chats when new message arrives
+          fetchLabels(); // Refresh labels when they change
         }
       )
       .subscribe();
@@ -116,16 +173,159 @@ export default function ChatList({
     return () => {
       subscription.unsubscribe();
     };
-  }, [currentUser]);
+  }, []);
+
+  const fetchChats = useCallback(async () => {
+    console.log("Fetching chats...");
+
+    const { data: chatMembers, error: chatsError } = await supabase
+      .from("chat_members")
+      .select(`
+        chat:chats (
+          *,
+          members:chat_members(
+            user:users(*)
+          ),
+          labels:chat_label_assignments(
+            label:chat_labels(*)
+          ),
+          messages:messages(
+            *,
+            sender:users(*)
+          )
+        )
+      `)
+      .eq("user_id", currentUser.id);
+
+    if (chatsError) {
+      console.error("Error fetching chats:", chatsError);
+      return;
+    }
+
+    if (!chatMembers) return;
+
+    // Format and sort chats
+    const formattedChats = chatMembers.map((cm: any) => {
+      const messages = cm.chat.messages || [];
+      const sortedMessages = [...messages].sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      return {
+        ...cm.chat,
+        members: cm.chat.members.map((m: any) => m.user),
+        messages: sortedMessages,
+        lastMessage: sortedMessages[0] || null,
+        labels: cm.chat.labels?.map((l: any) => l.label).filter(Boolean) || [],
+      };
+    });
+
+    // Sort chats by latest message timestamp
+    const sortedChats = formattedChats.sort((a: any, b: any) => {
+      const aTime = a.lastMessage?.created_at || a.created_at;
+      const bTime = b.lastMessage?.created_at || b.created_at;
+      return new Date(bTime).getTime() - new Date(aTime).getTime();
+    });
+
+    console.log("Setting new chats:", sortedChats);
+    setChats(sortedChats);
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let chatListSubscription: any = null;
+
+    const setupRealtimeSubscription = async () => {
+      // Initial fetch
+      await fetchChats();
+
+      // Set up realtime subscription
+      chatListSubscription = supabase
+        .channel(`chatlist:${currentUser.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'messages'
+          },
+          async (payload) => {
+            console.log('ChatList change received:', payload);
+
+            if (payload.eventType === 'INSERT') {
+              // Fetch the complete message with sender info
+              const { data: newMessage } = await supabase
+                .from("messages")
+                .select(
+                  `
+                  *,
+                  sender:users(
+                    id,
+                    full_name,
+                    mobile_number
+                  )
+                `
+                )
+                .eq("id", payload.new.id)
+                .single();
+
+              if (newMessage) {
+                // Update the specific chat's messages and lastMessage
+                setChats(prevChats => {
+                  return prevChats.map(chat => {
+                    if (chat.id === newMessage.chat_id) {
+                      const updatedMessages = [...(chat.messages || []), newMessage];
+                      // Sort messages by date, newest first
+                      const sortedMessages = updatedMessages.sort((a, b) => 
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                      );
+                      
+                      return {
+                        ...chat,
+                        messages: sortedMessages,
+                        lastMessage: sortedMessages[0]
+                      };
+                    }
+                    return chat;
+                  }).sort((a, b) => {
+                    // Re-sort chats by latest message
+                    const aTime = a.lastMessage?.created_at || a.created_at;
+                    const bTime = b.lastMessage?.created_at || b.created_at;
+                    return new Date(bTime).getTime() - new Date(aTime).getTime();
+                  });
+                });
+              }
+            }
+          }
+        )
+        .subscribe(status => {
+          console.log(`ChatList subscription status for user ${currentUser.id}:`, status);
+        });
+    };
+
+    setupRealtimeSubscription();
+
+    // Cleanup subscription
+    return () => {
+      console.log('Cleaning up ChatList subscription...');
+      if (chatListSubscription) {
+        chatListSubscription.unsubscribe();
+      }
+    };
+  }, [currentUser?.id, fetchChats]);
 
   const filteredChats = chats.filter((chat) => {
-    // Search filter
+    // Search filter - match against chat name, group name, or member names
     const searchMatch =
       searchQuery === "" ||
-      chat.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      chat.members.some((member: any) =>
-        member.full_name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      (chat.type === "private" &&
+        chat.members.some((member: { full_name: string }) =>
+          member.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+        )) ||
+      (chat.type === "group" &&
+        chat.name?.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Type filter
     const typeMatch =
@@ -136,50 +336,144 @@ export default function ChatList({
     return searchMatch && typeMatch;
   });
 
+  // Handle long press
+  const handleMouseDown = (chat: any) => {
+    const timeout = setTimeout(() => {
+      setSelectedChatForLabel(chat);
+      setShowLabelModal(true);
+    }, 500); // 500ms for long press
+    setLongPressTimeout(timeout);
+  };
+
+  const handleMouseUp = () => {
+    if (longPressTimeout) {
+      clearTimeout(longPressTimeout);
+    }
+  };
+
+  // Handle label assignment
+  const handleLabelAssign = async (labelId: string) => {
+    if (!selectedChatForLabel) return;
+
+    try {
+      // Check if label is already assigned
+      const { data: existingAssignment } = await supabase
+        .from("chat_label_assignments")
+        .select("*")
+        .eq("chat_id", selectedChatForLabel.id)
+        .eq("label_id", labelId)
+        .single();
+
+      if (existingAssignment) {
+        // Remove label if already assigned
+        await supabase
+          .from("chat_label_assignments")
+          .delete()
+          .eq("chat_id", selectedChatForLabel.id)
+          .eq("label_id", labelId);
+      } else {
+        // Assign new label
+        await supabase.from("chat_label_assignments").insert({
+          chat_id: selectedChatForLabel.id,
+          label_id: labelId,
+          assigned_by: currentUser.id,
+        });
+      }
+
+      // Optimistically update the UI
+      const updatedChats = chats.map((chat) => {
+        if (chat.id === selectedChatForLabel.id) {
+          const updatedLabels = existingAssignment
+            ? chat.labels.filter((l: Label) => l.id !== labelId)
+            : [...chat.labels, labels.find((l) => l.id === labelId)];
+          return { ...chat, labels: updatedLabels };
+        }
+        return chat;
+      });
+      setChats(updatedChats);
+    } catch (error) {
+      console.error("Error assigning label:", error);
+    }
+  };
+
+  const formatMessageDate = (date: Date) => {
+    if (isToday(date)) {
+      return "Today";
+    } else if (isYesterday(date)) {
+      return "Yesterday";
+    } else {
+      return format(date, "dd-MMM-yy");
+    }
+  };
+
   return (
     <div className="flex h-full">
       {/* Left Sidebar Navigation */}
       <nav className="w-[72px] bg-white border-r border-gray-200 flex flex-col items-center py-4">
-        <div className="flex-1 flex flex-col items-center space-y-6">
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <TiHome className="w-6 h-6" />
+        <div className="flex-1 flex flex-col items-center space-y-4">
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <TiHome className="w-5 h-5" />
           </button>
+          
+          {/* Divider */}
+          <div className="w-8 h-px bg-gray-200"></div>
+
           <div className="relative">
-            <button className="p-3 bg-green-50 text-green-600 rounded-lg relative">
-              <AiFillMessage className="w-6 h-6" />
+            <button className="p-2.5 bg-green-50 text-green-600 rounded-lg relative">
+              <AiFillMessage className="w-5 h-5" />
               <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-medium px-1.5 rounded-full min-w-[1.25rem] h-5 flex items-center justify-center">
                 12
               </span>
             </button>
           </div>
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <IoTicket className="w-6 h-6" />
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <IoTicket className="w-5 h-5" />
           </button>
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <GoGraph className="w-6 h-6" />
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <GoGraph className="w-5 h-5" />
           </button>
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <MdChecklist className="w-6 h-6" />
+
+          {/* Divider */}
+          <div className="w-8 h-px bg-gray-200"></div>
+
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <TfiMenuAlt className="w-5 h-5" />
           </button>
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <HiSpeakerphone className="w-6 h-6" />
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <HiSpeakerphone className="w-5 h-5" />
           </button>
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <HiUserGroup className="w-6 h-6" />
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <TiFlowMerge className="w-5 h-5" />
           </button>
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <RiContactsBookFill className="w-6 h-6" />
+
+          {/* Divider */}
+          <div className="w-8 h-px bg-gray-200"></div>
+
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <RiContactsBookFill className="w-5 h-5" />
           </button>
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <RiFolderImageFill className="w-6 h-6" />
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <RiFolderImageFill className="w-5 h-5" />
           </button>
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <VscDesktopDownload className="w-6 h-6" />
+
+          {/* Divider */}
+          <div className="w-8 h-px bg-gray-200"></div>
+
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <MdChecklist className="w-5 h-5" />
+          </button>
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <IoIosSettings className="w-5 h-5" />
           </button>
         </div>
-        <div className="mt-auto">
-          <button className="p-3 hover:bg-gray-100 text-gray-500">
-            <IoIosSettings className="w-6 h-6" />
+
+        {/* Bottom Icons */}
+        <div className="mt-auto flex flex-col space-y-4">
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <TbStarsFilled className="w-5 h-5" />
+          </button>
+          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+            <TbLayoutSidebarLeftExpandFilled className="w-5 h-5" />
           </button>
         </div>
       </nav>
@@ -187,7 +481,7 @@ export default function ChatList({
       {/* Chat List Section */}
       <div
         className="flex-1 flex flex-col bg-white relative"
-        style={{ width: "26rem", minWidth: "26rem" }}
+        style={{ width: "28rem", minWidth: "28rem" }}
       >
         {/* Search and Filter Section */}
         <div className="px-4 py-3">
@@ -203,7 +497,7 @@ export default function ChatList({
             </div>
 
             <div className="flex-1 flex items-center space-x-3">
-              <div className="flex-1">
+              <div className="flex-1 relative">
                 <div className="flex items-center bg-gray-50 rounded-lg px-3 py-1.5">
                   <FiSearch className="text-gray-400 w-4 h-4 min-w-[16px]" />
                   <input
@@ -213,14 +507,74 @@ export default function ChatList({
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full ml-2 text-gray-600 bg-transparent focus:outline-none text-sm placeholder-gray-500"
                   />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
 
               <div className="flex-shrink-0">
-                <button className="whitespace-nowrap flex items-center space-x-1.5 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-sm font-medium hover:bg-green-100">
+                <div
+                  className={`
+                    whitespace-nowrap flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer
+                    ${
+                      searchQuery
+                        ? "bg-green-500 text-white hover:bg-green-600"
+                        : "bg-green-50 text-green-600"
+                    }
+                    transition-colors duration-150
+                  `}
+                >
                   <BsFilter className="w-4 h-4 min-w-[16px]" />
-                  <span>Filtered</span>
-                </button>
+                  <span className="flex items-center">
+                    {searchQuery ? (
+                      <>
+                        <span>Filtered ({filteredChats.length})</span>
+                        <div
+                          role="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSearchQuery("");
+                          }}
+                          className="ml-2 p-0.5 hover:bg-green-600 rounded-full transition-colors duration-150"
+                        >
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2.5}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </div>
+                      </>
+                    ) : (
+                      "Filtered"
+                    )}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -240,88 +594,217 @@ export default function ChatList({
             return (
               <div
                 key={chat.id}
-                onClick={() => onChatSelect(chat)}
-                className={`flex items-start space-x-3 px-4 py-3 hover:bg-gray-50 cursor-pointer ${
-                  selectedChat?.id === chat.id ? "bg-gray-50" : ""
-                }`}
+                className="relative flex items-start space-x-3 px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                onClick={() =>
+                  onChatSelect({
+                    ...chat,
+                    labels: chat.labels || [],
+                  })
+                }
+                onMouseDown={() => handleMouseDown(chat)}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
               >
-                {/* Avatar */}
+                {/* Avatar section */}
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                    <span className="text-gray-600 font-medium text-lg">
-                      {chat.type === "private"
-                        ? otherMembers[0]?.full_name[0]
-                        : chat.name?.[0] || "G"}
-                    </span>
-                  </div>
+                  {chat.type === "private" ? (
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100">
+                      <img
+                        src={
+                          otherMembers[0]?.avatar_url ||
+                          `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherMembers[0]?.id}`
+                        }
+                        alt={otherMembers[0]?.full_name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initial if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null; // Prevent infinite loop
+                          target.style.display = "none";
+                          target.parentElement!.innerHTML = `<span class="w-full h-full flex items-center justify-center text-gray-600 font-medium text-lg">${otherMembers[0]?.full_name[0]}</span>`;
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white">
+                      <span className="text-lg font-medium">{chat.name?.[0] || 'G'}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Chat Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center">
                       <h3 className="text-sm font-medium text-gray-900 truncate">
                         {chatName}
                       </h3>
-                      <div className="flex items-center space-x-1.5">
-                        {chat.type === "private" && (
-                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
-                            Demo
-                          </span>
-                        )}
-                        {chat.type === "group" && (
-                          <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded">
-                            internal
-                          </span>
-                        )}
-                        {chat.unread_count > 0 && (
-                          <span className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded">
-                            +{chat.unread_count}
-                          </span>
-                        )}
-                      </div>
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {chat.lastMessage
-                        ? format(
-                            new Date(chat.lastMessage.created_at),
-                            "dd-MMM-yy"
-                          )
-                        : ""}
-                    </span>
+                    <div className="flex items-center space-x-1">
+                      {chat.labels && chat.labels.length > 0 && (
+                        <>
+                          {chat.labels
+                            .slice(0, 2)
+                            .map((label: Label & { textColor?: string }) => (
+                              <span
+                                key={label.id}
+                                className="px-1.5 py-0.5 text-xs rounded"
+                                style={{
+                                  backgroundColor: label.color,
+                                  color: label.textColor || "#6DE4A6",
+                                  fontSize: "11px",
+                                  lineHeight: "14px",
+                                }}
+                              >
+                                {label.name}
+                              </span>
+                            ))}
+                          {chat.labels.length > 2 && (
+                            <span className="text-xs text-gray-500">
+                              +{chat.labels.length - 2}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-1">
                     <p className="text-sm text-gray-500 truncate">
-                      {chat.lastMessage?.content || "No messages yet"}
+                      {latestMessages[chat.id]?.content || chat.lastMessage?.content || "No messages yet"}
                     </p>
-                    {chat.type === "private" &&
-                      otherMembers[0]?.mobile_number && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {otherMembers[0].mobile_number}
+                    <div className="flex items-center justify-between mt-0.5">
+                      {chat.type === "group" ? (
+                        <p className="text-xs text-gray-400">
+                          {chat.members[0]?.full_name} +
+                          {chat.members.length - 1}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-400">
+                          {otherMembers[0]?.mobile_number}
                         </p>
                       )}
+                      <span className="text-xs text-gray-500">
+                        {(latestMessages[chat.id] || chat.lastMessage)?.created_at
+                          ? formatMessageDate(
+                              new Date((latestMessages[chat.id] || chat.lastMessage).created_at)
+                            )
+                          : ""}
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                {/* Label Menu */}
+                {selectedChatForLabel?.id === chat.id && (
+                  <>
+                    <div
+                      className="fixed inset-0"
+                      onClick={() => setSelectedChatForLabel(null)}
+                    />
+                    <Menu as="div" className="absolute right-0 top-0 z-50">
+                      <Transition
+                        as={Fragment}
+                        show={true}
+                        enter="transition ease-out duration-100"
+                        enterFrom="transform opacity-0 scale-95"
+                        enterTo="transform opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="transform opacity-100 scale-100"
+                        leaveTo="transform opacity-0 scale-95"
+                      >
+                        <Menu.Items
+                          static
+                          className="absolute right-2 top-8 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                          style={{ backgroundColor: "white" }}
+                        >
+                          <div className="px-1 py-1 bg-white">
+                            <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
+                              Manage Labels
+                            </div>
+                            {labels.map((label) => {
+                              const isAssigned =
+                                selectedChatForLabel?.labels?.some(
+                                  (l: Label) => l.id === label.id
+                                );
+                              return (
+                                <Menu.Item key={label.id}>
+                                  {({ active }) => (
+                                    <button
+                                      onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        handleLabelAssign(label.id);
+                                        setSelectedChatForLabel(null);
+                                      }}
+                                      className={`
+                                        group flex w-full items-center px-3 py-2 text-sm
+                                        ${
+                                          isAssigned
+                                            ? "bg-gray-50 text-gray-900"
+                                            : "text-gray-700 hover:bg-gray-50"
+                                        }
+                                      `}
+                                    >
+                                      <div className="flex items-center justify-between w-full">
+                                        <div className="flex items-center">
+                                          <span
+                                            className={`w-2 h-2 rounded-full mr-2`}
+                                            style={{
+                                              backgroundColor: label.color,
+                                              border: `1px solid ${
+                                                label.textColor || "#6DE4A6"
+                                              }`,
+                                            }}
+                                          />
+                                          <span>{label.name}</span>
+                                        </div>
+                                        {isAssigned && (
+                                          <svg
+                                            className="h-4 w-4 text-green-500"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M5 13l4 4L19 7"
+                                            />
+                                          </svg>
+                                        )}
+                                      </div>
+                                    </button>
+                                  )}
+                                </Menu.Item>
+                              );
+                            })}
+                          </div>
+                        </Menu.Items>
+                      </Transition>
+                    </Menu>
+                  </>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* Bottom Icons */}
-        <div className="absolute bottom-4 left-4 flex items-center space-x-4">
-          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
-            <HiOutlineSparkles className="w-5 h-5" />
-          </button>
-          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
-            <IoIosSettings className="w-5 h-5" />
-          </button>
-        </div>
-
         {/* Floating New Chat Button */}
-        <button className="absolute bottom-4 right-4 w-12 h-12 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg">
+        <button
+          onClick={() => setShowNewChatDialog(true)}
+          className="absolute bottom-4 right-4 w-12 h-12 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg transition-colors duration-150"
+        >
           <AiFillMessage className="w-6 h-6" />
         </button>
       </div>
+
+      {/* New Chat Dialog */}
+      <NewChatDialog
+        isOpen={showNewChatDialog}
+        onClose={() => setShowNewChatDialog(false)}
+        onChatSelect={onChatSelect}
+        currentUser={currentUser}
+      />
     </div>
   );
 }

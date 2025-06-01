@@ -161,6 +161,7 @@ export default function AuthPage() {
             mobile_number: `+91${mobile}`,
             full_name: fullName,
             role: "member",
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`
           })
           .select()
           .single();
