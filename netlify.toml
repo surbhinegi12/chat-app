@@ -3,7 +3,6 @@
   publish = ".next"
 
 [build.environment]
-  NEXT_USE_NETLIFY_EDGE = "true"
   NODE_VERSION = "18"
   NEXT_TELEMETRY_DISABLED = "1"
 
@@ -11,12 +10,7 @@
   package = "@netlify/plugin-nextjs"
 
 [[redirects]]
-  from = "/"
-  to = "/login"
-  status = 302
-  force = true
-
-[[redirects]]
   from = "/*"
   to = "/index.html"
-  status = 200 
+  status = 200
+  force = true 

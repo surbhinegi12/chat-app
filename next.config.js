@@ -8,7 +8,6 @@ const nextConfig = {
                 hostname: '**',
             },
         ],
-        domains: ['api.dicebear.com'],
     },
     eslint: {
         ignoreDuringBuilds: true,
@@ -21,7 +20,7 @@ const nextConfig = {
             {
                 source: '/',
                 destination: '/login',
-                permanent: true,
+                permanent: false,
             },
         ]
     }
