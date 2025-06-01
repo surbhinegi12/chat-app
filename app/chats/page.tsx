@@ -12,6 +12,21 @@ import { FaMobileAlt } from "react-icons/fa";
 import { MdNotificationsOff, MdInstallDesktop } from "react-icons/md";
 import { LuRefreshCcwDot } from "react-icons/lu";
 
+interface ChatMember {
+  chat_id: string;
+  chat: {
+    id: string;
+    type: string;
+    members: Array<{
+      user: {
+        id: string;
+        full_name: string;
+        mobile_number: string;
+      };
+    }>;
+  };
+}
+
 export default function ChatsPage() {
   const router = useRouter();
   const [selectedChat, setSelectedChat] = useState<any>(null);
@@ -40,6 +55,94 @@ export default function ChatsPage() {
 
     checkAuth();
   }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let messageSubscription: any = null;
+
+    const setupMessageSubscription = async () => {
+      // First get all chats the user is a member of
+      const { data: userChats } = await supabase
+        .from('chat_members')
+        .select(`
+          chat_id,
+          chat:chats (
+            id,
+            type,
+            members:chat_members (
+              user:users (
+                id,
+                full_name,
+                mobile_number
+              )
+            )
+          )
+        `)
+        .eq('user_id', user.id);
+      
+      if (!userChats) return;
+
+      // Create a map of user details for quick lookup
+      const userDetailsMap = new Map();
+      (userChats as ChatMember[]).forEach(chatMember => {
+        chatMember.chat.members.forEach(member => {
+          if (member.user) {
+            userDetailsMap.set(member.user.id, member.user);
+          }
+        });
+      });
+
+      const chatIds = userChats.map(c => c.chat_id);
+      console.log('User is member of chats:', chatIds);
+
+      // Set up a single subscription for all chats
+      messageSubscription = supabase.channel('any-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `chat_id=in.(${chatIds.join(',')})`
+          },
+          (payload) => {
+            console.log('Message received:', payload);
+            
+            // Get sender details from our map
+            const senderDetails = userDetailsMap.get(payload.new.sender_id);
+            
+            if (senderDetails) {
+              const newMessage = {
+                ...payload.new,
+                sender: {
+                  id: senderDetails.id,
+                  full_name: senderDetails.full_name,
+                  mobile_number: senderDetails.mobile_number
+                }
+              };
+
+              // Update latest messages immediately
+              setLatestMessages(prev => ({
+                ...prev,
+                [payload.new.chat_id]: newMessage
+              }));
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('Subscription status:', status);
+        });
+    };
+
+    setupMessageSubscription();
+
+    return () => {
+      if (messageSubscription) {
+        messageSubscription.unsubscribe();
+      }
+    };
+  }, [user]);
 
   // Function to update latest message for a chat
   const updateLatestMessage = (chatId: string, message: any) => {

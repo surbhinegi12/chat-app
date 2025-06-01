@@ -316,6 +316,23 @@ export default function ChatList({
     };
   }, [currentUser?.id, fetchChats]);
 
+  // Add useEffect to sort chats when latestMessages changes
+  useEffect(() => {
+    if (Object.keys(latestMessages).length === 0) return;
+
+    setChats(prevChats => {
+      return [...prevChats].sort((a, b) => {
+        const aLatestMessage = latestMessages[a.id] || a.lastMessage;
+        const bLatestMessage = latestMessages[b.id] || b.lastMessage;
+        
+        const aTime = aLatestMessage?.created_at || a.created_at;
+        const bTime = bLatestMessage?.created_at || b.created_at;
+        
+        return new Date(bTime).getTime() - new Date(aTime).getTime();
+      });
+    });
+  }, [latestMessages]);
+
   const filteredChats = chats.filter((chat) => {
     // Search filter - match against chat name, group name, or member names
     const searchMatch =

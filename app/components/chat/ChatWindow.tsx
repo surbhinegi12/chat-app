@@ -135,57 +135,54 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
 
       // Set up realtime subscription
       messageSubscription = supabase
-        .channel(`messages:${chat.id}`)
+        .channel(`chat:${chat.id}`)
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'INSERT',
             schema: 'public',
             table: 'messages',
             filter: `chat_id=eq.${chat.id}`
           },
           async (payload) => {
-            console.log('Message change received:', payload);
+            console.log('ChatWindow message received:', payload);
 
-            if (payload.eventType === 'INSERT') {
-              // Fetch the complete message with sender info
-              const { data: newMessage } = await supabase
-                .from("messages")
-                .select(
-                  `
-                  *,
-                  sender:users(
-                    id,
-                    full_name,
-                    mobile_number
-                  )
+            // Fetch the complete message with sender info
+            const { data: newMessage } = await supabase
+              .from("messages")
+              .select(
                 `
+                *,
+                sender:users(
+                  id,
+                  full_name,
+                  mobile_number
                 )
-                .eq("id", payload.new.id)
-                .single();
+              `
+              )
+              .eq("id", payload.new.id)
+              .single();
 
-              if (newMessage) {
-                setMessages(prev => [...prev, newMessage]);
-                onNewMessage(newMessage);
-              }
+            if (newMessage) {
+              setMessages(prev => [...prev, newMessage]);
+              onNewMessage(newMessage);
             }
           }
         )
         .subscribe(status => {
-          console.log(`Message subscription status for chat ${chat.id}:`, status);
+          console.log(`Chat ${chat.id} subscription status:`, status);
         });
     };
 
     setupRealtimeSubscription();
 
-    // Cleanup subscription
     return () => {
-      console.log('Cleaning up message subscription...');
+      console.log('Cleaning up chat subscription...');
       if (messageSubscription) {
         messageSubscription.unsubscribe();
       }
     };
-  }, [chat?.id, onNewMessage]); // Add onNewMessage to dependencies
+  }, [chat?.id, onNewMessage]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
