@@ -366,7 +366,7 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
 
                 {message.type === "text" ? (
                   <>
-                    <p className="message-text text-[#0B0B0B] break-words font-normal">
+                    <p className="message-text text-[#0B0B0B] break-words font-medium">
                       {message.content}
                     </p>
                     <div className="flex items-center mt-2">
