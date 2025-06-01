@@ -1,40 +1,43 @@
-<<<<<<< HEAD
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 💬 Chat App 
 
-## Getting Started
+This is a real-time chat application built using modern full-stack technologies 
 
-First, run the development server:
+# 🔗 Live App : https://chat-app-negisurbhi.vercel.app/login/
 
-```bash
+## 🧰 Tech Stack
+
+- **Next.js** – React Framework for SSR & routing  
+- **TypeScript** – Strongly typed JavaScript  
+- **Tailwind CSS** – Utility-first CSS framework  
+- **Supabase** – Backend services  
+- **React Icons** – Icon pack used in the UI  
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone the repository
+git clone https://github.com/surbhinegi12/chat-app.git
+cd chat-app
+### 2. Install dependencies
+npm install
+### 3. Create environment variables
+Create a .env.local file in the root directory and add your Supabase project credentials:
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+### 4. Start the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+This project is actively being improved. The following features are planned or under development:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+📎 Sending media attachments (images, videos, files)
+⚡ More efficient real-time message delivery
+✏️ Typing indicators
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+📹 Demo Video
+https://github.com/user-attachments/assets/79add4e5-0fd8-4b1a-bdc4-392ccf97e905
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-=======
-# chat-app
->>>>>>> e87f9ccd5010fa951009c2e65fafaa29a472465d
