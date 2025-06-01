@@ -11,9 +11,10 @@ interface NewChatDialogProps {
   onClose: () => void;
   onChatSelect: (chat: any) => void;
   currentUser: any;
+  onChatCreated?: () => void;
 }
 
-export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUser }: NewChatDialogProps) {
+export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUser, onChatCreated }: NewChatDialogProps) {
   const [chatType, setChatType] = useState<'private' | 'group'>('private');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -144,6 +145,7 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
         };
 
         onChatSelect(formattedChat);
+        onChatCreated?.();
       } else {
         // Create group chat
         if (!groupName.trim()) {
@@ -185,6 +187,7 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
         };
 
         onChatSelect(formattedChat);
+        onChatCreated?.();
       }
 
       onClose();
@@ -223,22 +226,22 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-xl bg-white/90 backdrop-blur-sm p-6 shadow-xl transition-all">
-                <Dialog.Title className="text-lg font-medium text-gray-900 mb-4">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200 transition-all">
+                <Dialog.Title className="text-[22px] font-semibold text-gray-900 mb-6 px-6 pt-6">
                   Start New Chat
                 </Dialog.Title>
 
                 {/* Chat Type Selection */}
-                <div className="flex space-x-4 mb-6">
+                <div className="flex space-x-3 mb-6 px-6">
                   <button
                     onClick={() => {
                       setChatType('private');
                       setError('');
                     }}
-                    className={`flex items-center px-4 py-2 rounded-lg ${
+                    className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-[15px] font-medium transition-colors ${
                       chatType === 'private'
                         ? 'bg-green-500 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     <BsChatLeftText className="w-5 h-5 mr-2" />
@@ -249,10 +252,10 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
                       setChatType('group');
                       setError('');
                     }}
-                    className={`flex items-center px-4 py-2 rounded-lg ${
+                    className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-[15px] font-medium transition-colors ${
                       chatType === 'group'
                         ? 'bg-green-500 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     <HiUserGroup className="w-5 h-5 mr-2" />
@@ -260,10 +263,10 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
                   </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="px-6 space-y-4">
                   {/* Group Name Input (for group chat) */}
                   {chatType === 'group' && (
-                    <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2">
+                    <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3">
                       <HiUserGroup className="text-gray-400 w-5 h-5" />
                       <input
                         type="text"
@@ -273,13 +276,13 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
                           setError('');
                         }}
                         placeholder="Enter group name"
-                        className="w-full ml-2 bg-transparent focus:outline-none text-gray-600"
+                        className="w-full ml-3 bg-transparent focus:outline-none text-gray-700 placeholder-gray-500 text-[15px]"
                       />
                     </div>
                   )}
 
                   {/* Phone Number Input */}
-                  <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2">
+                  <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3">
                     <MdOutlineLocalPhone className="text-gray-400 w-5 h-5" />
                     <input
                       type="tel"
@@ -290,12 +293,12 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
                         setError('');
                       }}
                       placeholder={chatType === 'group' ? "Add member by phone number" : "Enter mobile number"}
-                      className="w-full ml-2 bg-transparent focus:outline-none text-gray-600"
+                      className="w-full ml-3 bg-transparent focus:outline-none text-gray-700 placeholder-gray-500 text-[15px]"
                     />
                     {chatType === 'group' && phoneNumber.length === 10 && (
                       <button
                         onClick={handleAddMember}
-                        className="ml-2 px-2 py-1 bg-green-500 text-white rounded-lg text-sm"
+                        className="ml-2 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
                       >
                         Add
                       </button>
@@ -305,17 +308,17 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
                   {/* Group Members List */}
                   {chatType === 'group' && members.length > 0 && (
                     <div className="mt-4">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2">Members:</h3>
+                      <h3 className="text-[15px] font-semibold text-gray-700 mb-2">Members:</h3>
                       <div className="space-y-2">
                         {members.map((member) => (
                           <div
                             key={member.id}
-                            className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
+                            className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-lg"
                           >
-                            <span className="text-sm text-gray-600">{member.full_name}</span>
+                            <span className="text-[15px] text-gray-700">{member.full_name}</span>
                             <button
                               onClick={() => setMembers(members.filter(m => m.id !== member.id))}
-                              className="text-red-500 hover:text-red-600"
+                              className="text-red-500 hover:text-red-600 font-medium"
                             >
                               Remove
                             </button>
@@ -326,13 +329,13 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
                   )}
 
                   {error && (
-                    <p className="text-sm text-red-600">{error}</p>
+                    <p className="text-sm text-red-600 font-medium">{error}</p>
                   )}
 
-                  <div className="flex justify-end space-x-3 mt-6">
+                  <div className="flex justify-end space-x-3 py-6">
                     <button
                       type="button"
-                      className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+                      className="px-4 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                       onClick={() => {
                         onClose();
                         resetForm();
@@ -345,7 +348,7 @@ export default function NewChatDialog({ isOpen, onClose, onChatSelect, currentUs
                       disabled={loading || (chatType === 'private' ? phoneNumber.length !== 10 : !groupName.trim() || members.length === 0)}
                       onClick={handleCreateChat}
                       className={`
-                        px-4 py-2 text-sm font-medium rounded-lg
+                        px-4 py-2.5 text-[15px] font-medium rounded-lg transition-colors
                         ${(!loading && ((chatType === 'private' && phoneNumber.length === 10) || (chatType === 'group' && groupName.trim() && members.length > 0)))
                           ? 'bg-green-500 text-white hover:bg-green-600'
                           : 'bg-gray-100 text-gray-400 cursor-not-allowed'

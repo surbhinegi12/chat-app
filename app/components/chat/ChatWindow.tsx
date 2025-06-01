@@ -36,7 +36,7 @@ import { IoGitNetworkOutline } from "react-icons/io5";
 import { BsArrowRightShort } from "react-icons/bs";
 import { TbLayoutSidebarRightExpandFilled, TbListDetails } from "react-icons/tb";
 import { MdGroups } from "react-icons/md";
-import { RiFolderImageFill, RiListSettingsLine } from "react-icons/ri";
+import { RiFolderImageFill, RiListSettingsLine, RiTelegram2Fill } from "react-icons/ri";
 
 interface Message {
   id: string;
@@ -323,13 +323,13 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
               message.sender_id === currentUser.id
                 ? "justify-end"
                 : "justify-start"
-            } mb-1`}
+            } mb-3`}
           >
             <div className="flex flex-col max-w-[65%]">
               <div
                 className={`rounded-2xl px-2.5 py-2 ${
                   message.sender_id === currentUser.id
-                    ? "bg-[#E7FFDB]"
+                    ? "bg-[#E7FEDC]"
                     : "bg-white"
                 }`}
               >
@@ -337,15 +337,15 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
                 {chat.type === "group" && (
                   <div className="flex items-center justify-between mb-1">
                     <span
-                      className={`text-[13px] font-medium ${
+                      className={`secondary-text font-semibold ${
                         message.sender_id === currentUser.id
-                          ? "text-[#1fa855]"
-                          : "text-[#1fa855]"
+                          ? "text-[#0F9152]"
+                          : "text-[#3BDB88]"
                       }`}
                     >
                       {message.sender.full_name}
                     </span>
-                    <span className="text-xs text-gray-500 ml-4">
+                    <span className="meta-text text-gray-500 font-normal ml-4">
                       {message.sender.mobile_number}
                     </span>
                   </div>
@@ -355,10 +355,10 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
                 {chat.type === "private" &&
                   message.sender_id !== currentUser.id && (
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[13px] font-medium text-[#1fa855]">
+                      <span className="secondary-text font-semibold text-[#3BDB88]">
                         {message.sender.full_name}
                       </span>
-                      <span className="text-xs text-gray-500 ml-4">
+                      <span className="meta-text text-gray-500 font-normal ml-4">
                         {message.sender.mobile_number}
                       </span>
                     </div>
@@ -366,25 +366,18 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
 
                 {message.type === "text" ? (
                   <>
-                    <p className="text-[15px] text-gray-800 font-normal leading-tight break-words">
+                    <p className="message-text text-[#0B0B0B] break-words font-normal">
                       {message.content}
                     </p>
-                    <div className="flex items-center mt-0.5">
+                    <div className="flex items-center mt-2">
                       {message.sender_id === currentUser.id && (
-                        <span className="text-[11px] text-gray-400 flex items-center">
-                          <svg
-                            viewBox="0 0 8 8"
-                            width="8"
-                            height="8"
-                            className="fill-current mr-1 opacity-75"
-                          >
-                            <path d="M4.5 1L2 3.5V5l1.5-1.5L7 7V5.5L4.5 1z" />
-                          </svg>
+                        <span className="meta-text text-gray-500 flex items-center font-normal">
+                          <RiTelegram2Fill className="w-3 h-3 mr-1 text-gray-500" />
                           periskope@hashlabs.dev
                         </span>
                       )}
                       <div className="flex items-center ml-auto">
-                        <span className="text-[11px] text-gray-400 ml-6">
+                        <span className="meta-text text-gray-500 font-normal ml-6">
                           {format(new Date(message.created_at), "HH:mm")}
                         </span>
                         {message.sender_id === currentUser.id && (
@@ -529,36 +522,36 @@ export default function ChatWindow({ chat, currentUser, onChatSelect, onNewMessa
       </div>
 
       {/* Right Toolbar */}
-      <nav className="w-[72px] bg-white border-l border-gray-200 flex flex-col items-center py-4">
-        <div className="flex-1 flex flex-col items-center space-y-4">
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+      <nav className="w-[72px] bg-white border-l border-gray-200 flex flex-col items-center py-2">
+        <div className="flex-1 flex flex-col items-center space-y-2">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <TbLayoutSidebarRightExpandFilled className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <LuRefreshCw className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <LuPencilLine className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <BsListNested className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <TbListDetails className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <FaHubspot className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <MdGroups className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <GoMention className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <RiFolderImageFill className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <RiListSettingsLine className="w-5 h-5" />
           </button>
         </div>

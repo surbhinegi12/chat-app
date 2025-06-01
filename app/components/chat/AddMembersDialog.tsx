@@ -104,58 +104,60 @@ export default function AddMembersDialog({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-xl bg-white/90 backdrop-blur-sm p-6 shadow-xl transition-all">
-                <Dialog.Title className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                  <HiUserAdd className="w-5 h-5 mr-2 text-green-500" />
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200 transition-all">
+                <Dialog.Title className="text-[22px] font-semibold text-gray-900 mb-6 px-6 pt-6 flex items-center">
+                  <HiUserAdd className="w-6 h-6 mr-3 text-green-500" />
                   Add Member to Chat
                 </Dialog.Title>
 
-                <div className="relative">
-                  <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 mb-4">
-                    <MdOutlineLocalPhone className="text-gray-400 w-5 h-5" />
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                        setPhoneNumber(val);
-                        setError('');
-                      }}
-                      placeholder="Enter mobile number"
-                      className="w-full ml-2 bg-transparent focus:outline-none text-gray-600"
-                    />
-                  </div>
+                <div className="px-6">
+                  <div className="relative">
+                    <div className="flex items-center bg-gray-50 rounded-lg px-4 py-3 mb-4">
+                      <MdOutlineLocalPhone className="text-gray-400 w-5 h-5" />
+                      <input
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          setPhoneNumber(val);
+                          setError('');
+                        }}
+                        placeholder="Enter mobile number"
+                        className="w-full ml-3 bg-transparent focus:outline-none text-gray-700 placeholder-gray-500 text-[15px]"
+                      />
+                    </div>
 
-                  {error && (
-                    <p className="text-sm text-red-600 mb-4">{error}</p>
-                  )}
+                    {error && (
+                      <p className="text-sm text-red-600 font-medium mb-4">{error}</p>
+                    )}
 
-                  {success && (
-                    <p className="text-sm text-green-600 mb-4">{success}</p>
-                  )}
+                    {success && (
+                      <p className="text-sm text-green-600 font-medium mb-4">{success}</p>
+                    )}
 
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                      onClick={onClose}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={phoneNumber.length !== 10 || loading}
-                      onClick={handleAddMember}
-                      className={`
-                        px-4 py-2 text-sm font-medium rounded-lg
-                        ${phoneNumber.length === 10 && !loading
-                          ? 'bg-green-500 text-white hover:bg-green-600'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }
-                      `}
-                    >
-                      {loading ? 'Adding...' : 'Add Member'}
-                    </button>
+                    <div className="flex justify-end space-x-3 py-6">
+                      <button
+                        type="button"
+                        className="px-4 py-2.5 text-[15px] font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                        onClick={onClose}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={phoneNumber.length !== 10 || loading}
+                        onClick={handleAddMember}
+                        className={`
+                          px-4 py-2.5 text-[15px] font-medium rounded-lg transition-colors
+                          ${phoneNumber.length === 10 && !loading
+                            ? 'bg-green-500 text-white hover:bg-green-600'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          }
+                        `}
+                      >
+                        {loading ? 'Adding...' : 'Add Member'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </Dialog.Panel>

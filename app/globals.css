@@ -3,12 +3,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --font-family: "Segoe UI", "Helvetica Neue", Helvetica, "Lucida Grande", Arial, Ubuntu, Cantarell, "Fira Sans", sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-family);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -19,8 +20,71 @@
   }
 }
 
+/* Base styles */
+html,
+body {
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Font weights to match WhatsApp */
+.font-normal {
+  font-weight: 400;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+/* Message text styles */
+.message-text {
+  font-size: 14.2px;
+  line-height: 19px;
+  color: #111b21;
+  letter-spacing: -0.1px;
+}
+
+/* Chat name styles */
+.chat-name {
+  font-size: 16px;
+  line-height: 21px;
+  letter-spacing: -0.2px;
+}
+
+/* Secondary text styles */
+.secondary-text {
+  font-size: 14px;
+  line-height: 19px;
+  letter-spacing: -0.1px;
+}
+
+/* Meta text styles (timestamps, etc) */
+.meta-text {
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0;
+}
+
+/* Input text styles */
+input,
+textarea {
+  font-family: var(--font-family);
+  letter-spacing: -0.1px;
+}
+
+/* Button text styles */
+button {
+  font-family: var(--font-family);
+  letter-spacing: -0.1px;
 }

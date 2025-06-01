@@ -30,6 +30,8 @@ import NewChatDialog from "./NewChatDialog";
 import { TfiMenuAlt } from "react-icons/tfi";
 import { TbStarsFilled } from "react-icons/tb";
 import { TbLayoutSidebarLeftExpandFilled } from "react-icons/tb";
+import { MdGroups } from "react-icons/md";
+import { MdOutlineLocalPhone } from "react-icons/md";
 
 interface Label {
   id: string;
@@ -80,14 +82,51 @@ interface ChatListProps {
   selectedChat: any;
   onChatSelect: (chat: any) => void;
   currentUser: any;
-  latestMessages: {[key: string]: Message};
+  latestMessages: { [key: string]: Message };
+  onRefreshChats?: () => Promise<void>;
 }
+
+const getLabelStyle = (labelName: string) => {
+  switch (labelName.toLowerCase()) {
+    case "dont send":
+      return {
+        textColor: "#FF4D4F",
+        bgColor: "#FFF2F2",
+      };
+    case "demo":
+      return {
+        textColor: "#B4876C",
+        bgColor: "#FEF6F3",
+      };
+    case "signup":
+      return {
+        textColor: "#3BDB88",
+        bgColor: "#F4FDF8",
+      };
+    case "internal":
+      return {
+        textColor: "#3BDB88",
+        bgColor: "#F4FDF8",
+      };
+    case "content":
+      return {
+        textColor: "#3BDB88",
+        bgColor: "#F4FDF8",
+      };
+    default:
+      return {
+        textColor: "#3BDB88",
+        bgColor: "#F4FDF8",
+      };
+  }
+};
 
 export default function ChatList({
   selectedChat,
   onChatSelect,
   currentUser,
   latestMessages,
+  onRefreshChats,
 }: ChatListProps) {
   const [chats, setChats] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -118,27 +157,27 @@ export default function ChatList({
 
           switch (label.name.toLowerCase()) {
             case "content":
-              textColor = "#6DE4A6";
+              textColor = "#3BDB88";
               bgColor = "#F4FDF8";
               break;
             case "demo":
-              textColor = "#C59F88";
-              bgColor = "#FDF9F8";
+              textColor = "#B4876C";
+              bgColor = "#FEF6F3";
               break;
             case "dont send":
-              textColor = "#E53E31";
-              bgColor = "#FEF5F5";
+              textColor = "#FF4D4F";
+              bgColor = "#FFF2F2";
               break;
             case "signup":
-              textColor = "#6DE4A6";
+              textColor = "#3BDB88";
               bgColor = "#F4FDF8";
               break;
             case "internal":
-              textColor = "#6DE4A6";
+              textColor = "#3BDB88";
               bgColor = "#F4FDF8";
               break;
             default:
-              textColor = "#6DE4A6";
+              textColor = "#3BDB88";
               bgColor = "#F4FDF8";
           }
 
@@ -180,7 +219,8 @@ export default function ChatList({
 
     const { data: chatMembers, error: chatsError } = await supabase
       .from("chat_members")
-      .select(`
+      .select(
+        `
         chat:chats (
           *,
           members:chat_members(
@@ -194,7 +234,8 @@ export default function ChatList({
             sender:users(*)
           )
         )
-      `)
+      `
+      )
       .eq("user_id", currentUser.id);
 
     if (chatsError) {
@@ -233,6 +274,12 @@ export default function ChatList({
   }, [currentUser?.id]);
 
   useEffect(() => {
+    if (onRefreshChats) {
+      onRefreshChats = fetchChats;
+    }
+  }, [fetchChats, onRefreshChats]);
+
+  useEffect(() => {
     if (!currentUser) return;
 
     let chatListSubscription: any = null;
@@ -245,16 +292,16 @@ export default function ChatList({
       chatListSubscription = supabase
         .channel(`chatlist:${currentUser.id}`)
         .on(
-          'postgres_changes',
+          "postgres_changes",
           {
-            event: '*',
-            schema: 'public',
-            table: 'messages'
+            event: "*",
+            schema: "public",
+            table: "messages",
           },
           async (payload) => {
-            console.log('ChatList change received:', payload);
+            console.log("ChatList change received:", payload);
 
-            if (payload.eventType === 'INSERT') {
+            if (payload.eventType === "INSERT") {
               // Fetch the complete message with sender info
               const { data: newMessage } = await supabase
                 .from("messages")
@@ -273,35 +320,47 @@ export default function ChatList({
 
               if (newMessage) {
                 // Update the specific chat's messages and lastMessage
-                setChats(prevChats => {
-                  return prevChats.map(chat => {
-                    if (chat.id === newMessage.chat_id) {
-                      const updatedMessages = [...(chat.messages || []), newMessage];
-                      // Sort messages by date, newest first
-                      const sortedMessages = updatedMessages.sort((a, b) => 
-                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                setChats((prevChats) => {
+                  return prevChats
+                    .map((chat) => {
+                      if (chat.id === newMessage.chat_id) {
+                        const updatedMessages = [
+                          ...(chat.messages || []),
+                          newMessage,
+                        ];
+                        // Sort messages by date, newest first
+                        const sortedMessages = updatedMessages.sort(
+                          (a, b) =>
+                            new Date(b.created_at).getTime() -
+                            new Date(a.created_at).getTime()
+                        );
+
+                        return {
+                          ...chat,
+                          messages: sortedMessages,
+                          lastMessage: sortedMessages[0],
+                        };
+                      }
+                      return chat;
+                    })
+                    .sort((a, b) => {
+                      // Re-sort chats by latest message
+                      const aTime = a.lastMessage?.created_at || a.created_at;
+                      const bTime = b.lastMessage?.created_at || b.created_at;
+                      return (
+                        new Date(bTime).getTime() - new Date(aTime).getTime()
                       );
-                      
-                      return {
-                        ...chat,
-                        messages: sortedMessages,
-                        lastMessage: sortedMessages[0]
-                      };
-                    }
-                    return chat;
-                  }).sort((a, b) => {
-                    // Re-sort chats by latest message
-                    const aTime = a.lastMessage?.created_at || a.created_at;
-                    const bTime = b.lastMessage?.created_at || b.created_at;
-                    return new Date(bTime).getTime() - new Date(aTime).getTime();
-                  });
+                    });
                 });
               }
             }
           }
         )
-        .subscribe(status => {
-          console.log(`ChatList subscription status for user ${currentUser.id}:`, status);
+        .subscribe((status) => {
+          console.log(
+            `ChatList subscription status for user ${currentUser.id}:`,
+            status
+          );
         });
     };
 
@@ -309,7 +368,7 @@ export default function ChatList({
 
     // Cleanup subscription
     return () => {
-      console.log('Cleaning up ChatList subscription...');
+      console.log("Cleaning up ChatList subscription...");
       if (chatListSubscription) {
         chatListSubscription.unsubscribe();
       }
@@ -320,14 +379,14 @@ export default function ChatList({
   useEffect(() => {
     if (Object.keys(latestMessages).length === 0) return;
 
-    setChats(prevChats => {
+    setChats((prevChats) => {
       return [...prevChats].sort((a, b) => {
         const aLatestMessage = latestMessages[a.id] || a.lastMessage;
         const bLatestMessage = latestMessages[b.id] || b.lastMessage;
-        
+
         const aTime = aLatestMessage?.created_at || a.created_at;
         const bTime = bLatestMessage?.created_at || b.created_at;
-        
+
         return new Date(bTime).getTime() - new Date(aTime).getTime();
       });
     });
@@ -426,70 +485,70 @@ export default function ChatList({
   return (
     <div className="flex h-full">
       {/* Left Sidebar Navigation */}
-      <nav className="w-[72px] bg-white border-r border-gray-200 flex flex-col items-center py-4">
-        <div className="flex-1 flex flex-col items-center space-y-4">
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+      <nav className="w-[72px] bg-white border-r border-gray-200 flex flex-col items-center py-2">
+        <div className="flex-1 flex flex-col items-center space-y-2">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <TiHome className="w-5 h-5" />
           </button>
-          
+
           {/* Divider */}
-          <div className="w-8 h-px bg-gray-200"></div>
+          <div className="w-8 h-px bg-gray-200 my-1"></div>
 
           <div className="relative">
-            <button className="p-2.5 bg-green-50 text-green-600 rounded-lg relative">
+            <button className="p-2 bg-green-50 text-green-600 rounded-lg relative">
               <AiFillMessage className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-medium px-1.5 rounded-full min-w-[1.25rem] h-5 flex items-center justify-center">
+              {/* <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-medium px-1.5 rounded-full min-w-[1.25rem] h-5 flex items-center justify-center">
                 12
-              </span>
+              </span> */}
             </button>
           </div>
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <IoTicket className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <GoGraph className="w-5 h-5" />
           </button>
 
           {/* Divider */}
-          <div className="w-8 h-px bg-gray-200"></div>
+          <div className="w-8 h-px bg-gray-200 my-1"></div>
 
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <TfiMenuAlt className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <HiSpeakerphone className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <TiFlowMerge className="w-5 h-5" />
           </button>
 
           {/* Divider */}
-          <div className="w-8 h-px bg-gray-200"></div>
+          <div className="w-8 h-px bg-gray-200 my-1"></div>
 
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <RiContactsBookFill className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <RiFolderImageFill className="w-5 h-5" />
           </button>
 
           {/* Divider */}
-          <div className="w-8 h-px bg-gray-200"></div>
+          <div className="w-8 h-px bg-gray-200 my-1"></div>
 
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <MdChecklist className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <IoIosSettings className="w-5 h-5" />
           </button>
         </div>
 
         {/* Bottom Icons */}
-        <div className="mt-auto flex flex-col space-y-4">
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+        <div className="mt-auto flex flex-col space-y-2">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <TbStarsFilled className="w-5 h-5" />
           </button>
-          <button className="p-2.5 hover:bg-gray-100 text-gray-500">
+          <button className="p-2 hover:bg-gray-100 text-gray-500">
             <TbLayoutSidebarLeftExpandFilled className="w-5 h-5" />
           </button>
         </div>
@@ -504,11 +563,11 @@ export default function ChatList({
         <div className="px-4 py-3">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
-              <button className="flex items-center space-x-1.5 text-green-600 text-sm font-medium hover:text-green-700">
+              <button className="flex items-center space-x-1.5 text-[#0F8F4F] text-sm font-semibold hover:text-[#0F8F4F]/90">
                 <RiMenuAddFill className="w-4 h-4" />
                 <span>Custom filter</span>
               </button>
-              <button className="px-3 py-1.5 text-gray-600 bg-white border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
+              <button className="px-3 py-1.5 text-gray-600 bg-white border border-gray-200 rounded-lg text-sm font-semibold hover:bg-gray-50">
                 Save
               </button>
             </div>
@@ -550,47 +609,17 @@ export default function ChatList({
               <div className="flex-shrink-0">
                 <div
                   className={`
-                    whitespace-nowrap flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer
+                    flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium cursor-pointer w-[100px]
                     ${
                       searchQuery
-                        ? "bg-green-500 text-white hover:bg-green-600"
-                        : "bg-green-50 text-green-600"
+                        ? "bg-[#0F8F4F] text-white hover:bg-[#0F8F4F]/90"
+                        : "bg-green-50 text-[#0F8F4F]"
                     }
                     transition-colors duration-150
                   `}
                 >
-                  <BsFilter className="w-4 h-4 min-w-[16px]" />
-                  <span className="flex items-center">
-                    {searchQuery ? (
-                      <>
-                        <span>Filtered ({filteredChats.length})</span>
-                        <div
-                          role="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSearchQuery("");
-                          }}
-                          className="ml-2 p-0.5 hover:bg-green-600 rounded-full transition-colors duration-150"
-                        >
-                          <svg
-                            className="w-3 h-3"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2.5}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </div>
-                      </>
-                    ) : (
-                      "Filtered"
-                    )}
-                  </span>
+                  <BsFilter className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex items-center">Filtered</span>
                 </div>
               </div>
             </div>
@@ -643,8 +672,8 @@ export default function ChatList({
                       />
                     </div>
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white">
-                      <span className="text-lg font-medium">{chat.name?.[0] || 'G'}</span>
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                      <MdGroups className="w-7 h-7 text-gray-600" />
                     </div>
                   )}
                 </div>
@@ -653,31 +682,30 @@ export default function ChatList({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">
+                      <h3 className="chat-name font-semibold text-gray-900 truncate">
                         {chatName}
                       </h3>
                     </div>
                     <div className="flex items-center space-x-1">
                       {chat.labels && chat.labels.length > 0 && (
                         <>
-                          {chat.labels
-                            .slice(0, 2)
-                            .map((label: Label & { textColor?: string }) => (
+                          {chat.labels.slice(0, 2).map((label: Label) => {
+                            const style = getLabelStyle(label.name);
+                            return (
                               <span
                                 key={label.id}
-                                className="px-1.5 py-0.5 text-xs rounded"
+                                className="px-1.5 py-0.5 meta-text font-semibold rounded"
                                 style={{
-                                  backgroundColor: label.color,
-                                  color: label.textColor || "#6DE4A6",
-                                  fontSize: "11px",
-                                  lineHeight: "14px",
+                                  backgroundColor: style.bgColor,
+                                  color: style.textColor,
                                 }}
                               >
                                 {label.name}
                               </span>
-                            ))}
+                            );
+                          })}
                           {chat.labels.length > 2 && (
-                            <span className="text-xs text-gray-500">
+                            <span className="meta-text text-gray-500 font-semibold">
                               +{chat.labels.length - 2}
                             </span>
                           )}
@@ -686,24 +714,37 @@ export default function ChatList({
                     </div>
                   </div>
                   <div className="mt-1">
-                    <p className="text-sm text-gray-500 truncate">
-                      {latestMessages[chat.id]?.content || chat.lastMessage?.content || "No messages yet"}
+                    <p className="secondary-text text-gray-500 truncate font-normal">
+                      {latestMessages[chat.id]?.content ||
+                        chat.lastMessage?.content ||
+                        "No messages yet"}
                     </p>
                     <div className="flex items-center justify-between mt-0.5">
                       {chat.type === "group" ? (
-                        <p className="text-xs text-gray-400">
-                          {chat.members[0]?.full_name} +
-                          {chat.members.length - 1}
-                        </p>
+                        <div className="flex items-center bg-gray-50 rounded-lg px-2 py-1">
+                          <MdOutlineLocalPhone className="w-4 h-4 text-gray-400 mr-1" />
+                          <span className="text-xs text-gray-500 font-medium">
+                            {chat.members[0]?.mobile_number} +
+                            {chat.members.length - 1}
+                          </span>
+                        </div>
                       ) : (
-                        <p className="text-xs text-gray-400">
-                          {otherMembers[0]?.mobile_number}
-                        </p>
+                        <div className="flex items-center bg-gray-50 rounded-lg px-2 py-1">
+                          <MdOutlineLocalPhone className="w-4 h-4 text-gray-400 mr-1" />
+                          <span className="text-xs text-gray-500 font-medium">
+                            {otherMembers[0]?.mobile_number}
+                          </span>
+                        </div>
                       )}
-                      <span className="text-xs text-gray-500">
-                        {(latestMessages[chat.id] || chat.lastMessage)?.created_at
+                      <span className="meta-text text-gray-500 font-normal">
+                        {(latestMessages[chat.id] || chat.lastMessage)
+                          ?.created_at
                           ? formatMessageDate(
-                              new Date((latestMessages[chat.id] || chat.lastMessage).created_at)
+                              new Date(
+                                (
+                                  latestMessages[chat.id] || chat.lastMessage
+                                ).created_at
+                              )
                             )
                           : ""}
                       </span>
@@ -731,11 +772,11 @@ export default function ChatList({
                       >
                         <Menu.Items
                           static
-                          className="absolute right-2 top-8 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                          className="absolute right-2 top-8 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-sm ring-1 ring-gray-200 focus:outline-none"
                           style={{ backgroundColor: "white" }}
                         >
                           <div className="px-1 py-1 bg-white">
-                            <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
+                            <div className="px-3 py-2.5 text-[15px] font-semibold text-gray-700 border-b border-gray-100">
                               Manage Labels
                             </div>
                             {labels.map((label) => {
@@ -753,7 +794,7 @@ export default function ChatList({
                                         setSelectedChatForLabel(null);
                                       }}
                                       className={`
-                                        group flex w-full items-center px-3 py-2 text-sm
+                                        group flex w-full items-center px-3 py-2.5 text-sm
                                         ${
                                           isAssigned
                                             ? "bg-gray-50 text-gray-900"
@@ -772,7 +813,9 @@ export default function ChatList({
                                               }`,
                                             }}
                                           />
-                                          <span>{label.name}</span>
+                                          <span className="font-medium">
+                                            {label.name}
+                                          </span>
                                         </div>
                                         {isAssigned && (
                                           <svg
