@@ -35,6 +35,9 @@ This project is actively being improved. The following features are planned or u
 ✏️ Typing indicators
 
 
+### 🔐 OTP Note
+For demo purposes, the OTP for all users is 123456.
+
 📹 Demo Video
 https://github.com/user-attachments/assets/79add4e5-0fd8-4b1a-bdc4-392ccf97e905
 
