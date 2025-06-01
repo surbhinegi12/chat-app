@@ -8,6 +8,7 @@ const nextConfig = {
                 hostname: '**',
             },
         ],
+        domains: ['api.dicebear.com'],
     },
     eslint: {
         ignoreDuringBuilds: true,

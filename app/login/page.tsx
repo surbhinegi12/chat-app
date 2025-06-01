@@ -135,7 +135,7 @@ export default function AuthPage() {
         }
 
         // Store user info in localStorage
-        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem("user", JSON.stringify(user));
       }
 
       if (tab === "signup") {
@@ -161,7 +161,7 @@ export default function AuthPage() {
             mobile_number: `+91${mobile}`,
             full_name: fullName,
             role: "member",
-            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
           })
           .select()
           .single();
@@ -169,14 +169,14 @@ export default function AuthPage() {
         if (insertError) throw insertError;
 
         // Store user info in localStorage
-        localStorage.setItem('user', JSON.stringify(newUser));
+        localStorage.setItem("user", JSON.stringify(newUser));
       }
 
-      setStatus({ type: "success", message: "Success! Redirecting..." });
+      setStatus({ type: "success", message: "Logging you in" });
 
       // Wait for the status message to be visible
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      
+
       router.push("/chats");
     } catch (err: any) {
       console.error("Submit Error:", err);
