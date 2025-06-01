@@ -4,6 +4,7 @@
 
 :root {
   --foreground-rgb: 0, 0, 0;
+  --background-rgb: 255, 255, 255;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
   --background: #ffffff;
@@ -32,52 +33,49 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-}
-
-body {
-  background-color: var(--background);
-  color: var(--foreground);
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
 }
 
 /* Font weights to match WhatsApp */
 .font-normal {
-  font-weight: 400;
+  font-variation-settings: "wght" 400;
 }
 
 .font-medium {
-  font-weight: 500;
+  font-variation-settings: "wght" 500;
 }
 
 .font-semibold {
-  font-weight: 600;
+  font-variation-settings: "wght" 600;
 }
 
 /* Message text styles */
 .message-text {
-  font-size: 14.2px;
-  line-height: 19px;
+  font-size: 15px;
+  line-height: 1.4;
   color: #111b21;
   letter-spacing: -0.1px;
 }
 
 /* Chat name styles */
 .chat-name {
-  font-size: 16px;
-  line-height: 21px;
+  font-size: 15px;
+  line-height: 1.4;
   letter-spacing: -0.2px;
 }
 
 /* Secondary text styles */
 .secondary-text {
   font-size: 14px;
-  line-height: 19px;
+  line-height: 1.4;
   letter-spacing: -0.1px;
 }
 
 /* Meta text styles (timestamps, etc) */
 .meta-text {
-  font-size: 11px;
-  line-height: 14px;
+  font-size: 12px;
+  line-height: 1.4;
   letter-spacing: 0;
 }
 
